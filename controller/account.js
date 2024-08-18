@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Account = require('../models/account'); // Pastikan path benar sesuai struktur proyek Anda
+const Account = require('../model/Account'); // Pastikan path benar sesuai struktur proyek Anda
 // const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const ErrorHandler = require('../utils/ErrorHandler');
