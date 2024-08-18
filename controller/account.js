@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Account = require('../models/account'); // Pastikan path benar sesuai struktur proyek Anda
-const { isAuthenticated, isAdmin } = require('../middleware/auth');
+// const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const ErrorHandler = require('../utils/ErrorHandler');
 const Validator = require('fastest-validator');
@@ -10,7 +10,7 @@ const v = new Validator();
 // Create Account
 router.post(
   '',
-  isAuthenticated,
+  // isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     const accountSchema = {
       name: { type: 'string', min: 3, empty: false },
@@ -102,7 +102,7 @@ router.get(
 // Update Account
 router.put(
   '/:id',
-  isAuthenticated,
+  // isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     const accountId = req.params.id;
     const accountSchema = {
@@ -153,7 +153,7 @@ router.put(
 // Delete Account
 router.delete(
   '/:id',
-  isAuthenticated,
+  // isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     const accountId = req.params.id;
 
