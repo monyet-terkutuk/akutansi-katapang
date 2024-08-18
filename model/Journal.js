@@ -11,7 +11,7 @@ const detailSchema = new Schema(
       type: Number,
       required: [true, 'Credit harus diisi'],
     },
-    account_id: {
+    account: {
       type: Schema.Types.ObjectId,
       ref: 'Account',
       required: [true, 'Account harus ada'],

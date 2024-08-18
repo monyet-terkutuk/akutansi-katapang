@@ -30,6 +30,7 @@ const product = require("./controller/product");
 const comment = require("./controller/comment");
 const category = require("./controller/category");
 const dashboard = require("./controller/dasboard");
+const journal = require("./controller/journal");
 
 app.use("/users", user);
 app.use("/products", product);
@@ -38,6 +39,7 @@ app.use("/comments", comment);
 app.use("/categories", category);
 app.use("/dashboard", dashboard);
 app.use("/account", account);
+app.use("/journal", journal);
 
 
 // app.use("", welcome);

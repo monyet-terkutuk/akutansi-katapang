@@ -1,26 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const Journal = require('../models/journal'); // Pastikan path benar sesuai struktur proyek Anda
+const Journal = require('../model/Journal'); // Pastikan path benar sesuai struktur proyek Anda
 const { isAuthenticated } = require('../middleware/auth');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const ErrorHandler = require('../utils/ErrorHandler');
 const Validator = require('fastest-validator');
 const v = new Validator();
 
+// Schema untuk validasi input menggunakan Fastest Validator
+const journalSchema = {
+  name: { type: 'string', min: 3, empty: false },
+  image: { type: 'string', optional: true },
+  journal_date: { type: 'string', optional: true },
+  detail: { type: 'array', items: 'object', min: 1, empty: false },
+  data_change: { type: 'boolean', optional: true },
+  note: { type: 'string', optional: true },
+};
+
 // Create Journal
 router.post(
   '',
-  isAuthenticated,
+//   isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
-    const journalSchema = {
-      name: { type: 'string', min: 3, empty: false },
-      image: { type: 'string', optional: true },
-      journal_date: { type: 'date', optional: true },
-      detail: { type: 'array', items: 'object', min: 1, empty: false },
-      data_change: { type: 'boolean', optional: true },
-      note: { type: 'string', optional: true },
-    };
-
     const { body } = req;
 
     // Validate input data
@@ -75,8 +76,8 @@ router.get(
     const journalId = req.params.id;
 
     try {
-      // Find journal by ID
-      const journal = await Journal.findById(journalId);
+      // Find journal by ID and populate account_id in detail
+      const journal = await Journal.findById(journalId).populate('detail.account_id');
 
       if (!journal) {
         return res.status(404).json({
@@ -100,18 +101,9 @@ router.get(
 // Update Journal
 router.put(
   '/:id',
-  isAuthenticated,
+//   isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     const journalId = req.params.id;
-    const journalSchema = {
-      name: { type: 'string', min: 3, empty: false },
-      image: { type: 'string', optional: true },
-      journal_date: { type: 'date', optional: true },
-      detail: { type: 'array', items: 'object', min: 1, empty: false },
-      data_change: { type: 'boolean', optional: true },
-      note: { type: 'string', optional: true },
-    };
-
     const { body } = req;
 
     // Validate input data
@@ -154,7 +146,7 @@ router.put(
 // Delete Journal
 router.delete(
   '/:id',
-  isAuthenticated,
+//   isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     const journalId = req.params.id;
 
