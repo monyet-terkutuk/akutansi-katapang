@@ -11,11 +11,22 @@ const v = new Validator();
 const journalSchema = {
   name: { type: 'string', min: 3, empty: false },
   image: { type: 'string', optional: true },
-  journal_date: { type: 'string', optional: true },
+  journal_date: {
+    type: 'string',
+    optional: true,
+    custom(value, errors) {
+      const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/; // MM/DD/YYYY format
+      if (!regex.test(value)) {
+        errors.push({ type: "datePattern", actual: value, expected: "MM/DD/YYYY" });
+      }
+      return value;
+    }
+  },
   detail: { type: 'array', items: 'object', min: 1, empty: false },
   data_change: { type: 'boolean', optional: true },
   note: { type: 'string', optional: true },
 };
+
 
 // Create Journal
 router.post(
@@ -39,6 +50,10 @@ router.post(
     }
 
     try {
+       // Optionally, convert `journal_date` to a desired format before saving
+       const [month, day, year] = body.journal_date.split('/');
+       body.journal_date = `${year}-${month}-${day}`; // Converts to YYYY-MM-DD format
+
       // Create new journal
       const journal = await Journal.create(body);
       return res.status(201).json({
@@ -57,7 +72,7 @@ router.get(
   '/list',
   catchAsyncErrors(async (req, res, next) => {
     try {
-      const journals = await Journal.find().sort({ createdAt: -1 });
+      const journals = await Journal.find().populate('detail.account').sort({ createdAt: -1 });
       return res.status(200).json({
         code: 200,
         status: 'success',
@@ -77,7 +92,7 @@ router.get(
 
     try {
       // Find journal by ID and populate account_id in detail
-      const journal = await Journal.findById(journalId).populate('detail.account_id');
+      const journal = await Journal.findById(journalId).populate('detail.account');
 
       if (!journal) {
         return res.status(404).json({
@@ -121,6 +136,10 @@ router.put(
     }
 
     try {
+       // Optionally, convert `journal_date` to a desired format before saving
+       const [month, day, year] = body.journal_date.split('/');
+       body.journal_date = `${year}-${month}-${day}`; // Converts to YYYY-MM-DD format
+       
       // Update journal
       const journal = await Journal.findByIdAndUpdate(journalId, body, { new: true, runValidators: true });
 

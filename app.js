@@ -24,6 +24,7 @@ if (process.env.NODE_ENV !== "PRODUCTION") {
 
 // import routes
 const account = require("./controller/account");
+const balance = require("./controller/Balance");
 const user = require("./controller/user");
 const transaction = require("./controller/transaction");
 const product = require("./controller/product");
@@ -40,6 +41,7 @@ app.use("/categories", category);
 app.use("/dashboard", dashboard);
 app.use("/account", account);
 app.use("/journal", journal);
+app.use("/balance", balance);
 
 
 // app.use("", welcome);
