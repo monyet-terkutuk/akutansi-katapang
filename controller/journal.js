@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const Journal = require('../model/Journal'); // Pastikan path benar sesuai struktur proyek Anda
 const { isAuthenticated } = require('../middleware/auth');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
@@ -105,6 +107,95 @@ router.get(
         status: 'success',
         data: journals,
       });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+// Export Journals to Excel
+router.get(
+  '/export',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // Helper function to convert MM/DD/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null;
+        const [month, day, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      // Convert the date formats
+      const start = convertDateFormat(startDate);
+      const end = convertDateFormat(endDate);
+
+      // Build the query object
+      const query = {};
+
+      if (start && end) {
+        query.journal_date = {
+          $gte: new Date(start),
+          $lte: new Date(end),
+        };
+      }
+
+      // Fetch journals with optional date range filter
+      const journals = await Journal.find(query)
+        .populate('detail.account')
+        .sort({ journal_date: -1 });
+
+      // Create a new workbook and add a worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Laporan Jurnal Umum');
+
+      // Define the headers and their keys
+      worksheet.columns = [
+        { header: 'No', key: 'No', width: 5 },
+        { header: 'Tanggal', key: 'Tanggal', width: 15 },
+        { header: 'Nama Jurnal', key: 'Nama_Jurnal', width: 30 },
+        { header: 'Keterangan Journal', key: 'Keterangan_Journal', width: 30 },
+        { header: 'Nama Akun', key: 'Nama_Akun', width: 20 },
+        { header: 'Kredit', key: 'Kredit', width: 15 },
+        { header: 'Debit', key: 'Debit', width: 15 },
+        { header: 'Keterangan Akun', key: 'Keterangan_Akun', width: 30 },
+      ];
+
+      // Set style only for the header row (row 1)
+      const headerRow = worksheet.getRow(1);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: '404040' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0E0E0' } };
+        cell.alignment = { horizontal: 'center' };
+      });
+
+      // Prepare data and add rows
+      journals.forEach((journal, index) => {
+        journal.detail.forEach((d, detailIndex) => {
+          worksheet.addRow({
+            No: detailIndex === 0 ? index + 1 : '', // Hanya tampilkan No pada baris pertama
+            Tanggal: detailIndex === 0 ? new Date(journal.journal_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '', // Format Tanggal: 12 March 2024
+            Nama_Jurnal: detailIndex === 0 ? journal.name : '', // Hanya tampilkan nama jurnal pada baris pertama
+            Keterangan_Journal: detailIndex === 0 ? journal.note || '' : '', // Hanya tampilkan keterangan jurnal pada baris pertama
+            Nama_Akun: d.account ? d.account.name : '',
+            Kredit: d.credit,
+            Debit: d.debit,
+            Keterangan_Akun: d.note || '',
+          });
+        });
+      });
+
+      // Write to buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Set header untuk download file
+      res.setHeader('Content-Disposition', 'attachment; filename="Laporan Jurnal Umum.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+      // Kirim buffer sebagai response
+      res.send(buffer);
+
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
     }
