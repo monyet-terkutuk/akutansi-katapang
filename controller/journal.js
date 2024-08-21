@@ -17,11 +17,11 @@ const journalSchema = {
     custom(value, errors) {
       const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/; // MM/DD/YYYY format
       if (!regex.test(value)) {
-        errors.push({ type: "datePattern", actual: value, expected: "MM/DD/YYYY" });
+        return [{ type: "datePattern", expected: "MM/DD/YYYY", actual: value }];
       }
       return value;
     }
-  },
+  },  
   detail: { type: 'array', items: 'object', min: 1, empty: false },
   data_change: { type: 'boolean', optional: true },
   note: { type: 'string', optional: true },
@@ -72,7 +72,34 @@ router.get(
   '/list',
   catchAsyncErrors(async (req, res, next) => {
     try {
-      const journals = await Journal.find().populate('detail.account').sort({ createdAt: -1 });
+      const { startDate, endDate } = req.query;
+
+      // Helper function to convert MM/DD/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null;
+        const [month, day, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      // Convert the date formats
+      const start = convertDateFormat(startDate);
+      const end = convertDateFormat(endDate);
+
+      // Build the query object
+      const query = {};
+
+      if (start && end) {
+        query.journal_date = {
+          $gte: new Date(start),
+          $lte: new Date(end),
+        };
+      }
+
+      // Fetch journals with optional date range filter
+      const journals = await Journal.find(query)
+        .populate('detail.account')
+        .sort({ journal_date: -1 });
+
       return res.status(200).json({
         code: 200,
         status: 'success',
@@ -106,6 +133,24 @@ router.get(
         code: 200,
         status: 'success',
         data: journal,
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+router.delete(
+  '/delete-all-journals',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // Delete all journals
+      const result = await Journal.deleteMany({});
+
+      return res.status(200).json({
+        code: 200,
+        status: 'success',
+        message: `${result.deletedCount} journals deleted successfully`,
       });
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));

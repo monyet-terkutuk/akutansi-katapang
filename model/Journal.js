@@ -16,6 +16,9 @@ const detailSchema = new Schema(
       ref: 'Account',
       required: [true, 'Account harus ada'],
     },
+    note: {
+      type: String,
+    },
   }
 );
 

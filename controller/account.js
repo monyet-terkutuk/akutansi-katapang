@@ -70,6 +70,74 @@ router.get(
   })
 );
 
+// Buku Besar
+router.get(
+  '/accounts-with-journals',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // Helper function to convert MM/DD/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null;
+        const [month, day, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      // Convert the date formats
+      const start = convertDateFormat(startDate);
+      const end = convertDateFormat(endDate);
+
+      const accountsWithJournals = await Account.aggregate([
+        {
+          $lookup: {
+            from: 'journals',
+            let: { accountId: '$_id' },
+            pipeline: [
+              {
+                $unwind: '$detail',
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ['$detail.account', '$$accountId'],
+                  },
+                  ...(start && end ? {
+                    'date': { // Assuming there is a 'date' field in the journal details
+                      $gte: new Date(start),
+                      $lte: new Date(end),
+                    }
+                  } : {})
+                },
+              },
+            ],
+            as: 'journal_details',
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            account_code: 1,
+            account_type: 1,
+            journal_details: '$journal_details.detail',
+          },
+        },
+      ]);
+
+      return res.status(200).json({
+        code: 200,
+        status: 'success',
+        data: accountsWithJournals,
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+
+
 // Get Account by ID
 router.get(
   '/:id',
