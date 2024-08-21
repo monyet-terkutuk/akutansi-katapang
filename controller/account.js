@@ -103,7 +103,7 @@ router.get(
                     $eq: ['$detail.account', '$$accountId'],
                   },
                   ...(start && end ? {
-                    'date': { // Assuming there is a 'date' field in the journal details
+                    journal_date: { // Use 'journal_date' to filter based on journal date
                       $gte: new Date(start),
                       $lte: new Date(end),
                     }
@@ -135,6 +135,7 @@ router.get(
     }
   })
 );
+
 
 
 
