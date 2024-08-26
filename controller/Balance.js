@@ -91,7 +91,8 @@ router.get(
               },
               {
                 $group: {
-                  _id: null,
+                  _id: '$journal_date', // Group by journal_date
+                  journal_date: { $first: '$journal_date' }, // Capture the journal date
                   totalDebit: { $sum: '$detail.debit' },
                   totalCredit: { $sum: '$detail.credit' },
                 },
@@ -102,10 +103,15 @@ router.get(
         },
         {
           $project: {
-            _id: 1,
+            _id: 1, // Include _id (you can remove this line if you do not want it in the output)
             name: 1,
             account_code: 1,
             account_type: 1,
+            journal_summary: {
+              journal_date: 1, // Include journal_date
+              totalDebit: 1,
+              totalCredit: 1,
+            },
             totalDebit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalDebit', 0] }, 0] },
             totalCredit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalCredit', 0] }, 0] },
           },
@@ -124,7 +130,6 @@ router.get(
 );
 
 
-// Laporan Laba Rugi
 router.get(
   '/pendapatan-beban',
   catchAsyncErrors(async (req, res, next) => {
@@ -171,7 +176,7 @@ router.get(
               },
               {
                 $group: {
-                  _id: null,
+                  _id: '$journal_date', // Group by journal date
                   totalDebit: { $sum: '$detail.debit' },
                   totalCredit: { $sum: '$detail.credit' },
                 },
@@ -186,12 +191,13 @@ router.get(
             name: 1,
             account_code: 1,
             account_type: 1,
-            totalDebit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalDebit', 0] }, 0] },
-            totalCredit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalCredit', 0] }, 0] },
+            journal_summary: 1, // Include the journal summary with date
+            totalDebit: { $ifNull: [{ $sum: '$journal_summary.totalDebit' }, 0] },
+            totalCredit: { $ifNull: [{ $sum: '$journal_summary.totalCredit' }, 0] },
             total: { 
               $subtract: [
-                { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalDebit', 0] }, 0] }, 
-                { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalCredit', 0] }, 0] }
+                { $sum: '$journal_summary.totalDebit' }, 
+                { $sum: '$journal_summary.totalCredit' }
               ] 
             },
           },

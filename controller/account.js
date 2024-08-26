@@ -110,6 +110,15 @@ router.get(
                   } : {})
                 },
               },
+              {
+                $project: {
+                  _id: 0,
+                  debit: '$detail.debit',
+                  credit: '$detail.credit',
+                  note: '$detail.note',
+                  journal_date: 1, // Include journal_date in the result
+                },
+              },
             ],
             as: 'journal_details',
           },
@@ -120,7 +129,7 @@ router.get(
             name: 1,
             account_code: 1,
             account_type: 1,
-            journal_details: '$journal_details.detail',
+            journal_details: 1, // Include all journal details with date
           },
         },
       ]);
@@ -135,6 +144,7 @@ router.get(
     }
   })
 );
+
 
 
 
