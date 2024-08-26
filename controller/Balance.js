@@ -67,7 +67,7 @@ router.get(
       const start = convertDateFormat(startDate);
       const end = convertDateFormat(endDate);
 
-      const accountsWithJournals = await Account.aggregate([
+      const accountsWithTotals = await Account.aggregate([
         {
           $lookup: {
             from: 'journals',
@@ -82,7 +82,7 @@ router.get(
                     $eq: ['$detail.account', '$$accountId'],
                   },
                   ...(start && end ? {
-                    journal_date: { // Use 'journal_date' to filter based on journal date
+                    journal_date: { 
                       $gte: new Date(start),
                       $lte: new Date(end),
                     }
@@ -91,8 +91,7 @@ router.get(
               },
               {
                 $group: {
-                  _id: '$journal_date', // Group by journal_date
-                  journal_date: { $first: '$journal_date' }, // Capture the journal date
+                  _id: null, // We only care about the totals
                   totalDebit: { $sum: '$detail.debit' },
                   totalCredit: { $sum: '$detail.credit' },
                 },
@@ -102,18 +101,22 @@ router.get(
           },
         },
         {
+          $unwind: '$journal_summary', // Unwind to flatten the structure
+        },
+        {
+          $addFields: {
+            total: { $subtract: ['$journal_summary.totalDebit', '$journal_summary.totalCredit'] },
+          },
+        },
+        {
           $project: {
-            _id: 1, // Include _id (you can remove this line if you do not want it in the output)
+            _id: 1,
             name: 1,
             account_code: 1,
             account_type: 1,
-            journal_summary: {
-              journal_date: 1, // Include journal_date
-              totalDebit: 1,
-              totalCredit: 1,
-            },
-            totalDebit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalDebit', 0] }, 0] },
-            totalCredit: { $ifNull: [{ $arrayElemAt: ['$journal_summary.totalCredit', 0] }, 0] },
+            totalDebit: '$journal_summary.totalDebit',
+            totalCredit: '$journal_summary.totalCredit',
+            total: 1, // Include the total in the output
           },
         },
       ]);
@@ -121,7 +124,7 @@ router.get(
       return res.status(200).json({
         code: 200,
         status: 'success',
-        data: accountsWithJournals,
+        data: accountsWithTotals,
       });
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
@@ -129,7 +132,7 @@ router.get(
   })
 );
 
-
+// pendapatan-beban
 router.get(
   '/pendapatan-beban',
   catchAsyncErrors(async (req, res, next) => {
