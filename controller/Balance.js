@@ -198,18 +198,29 @@ router.get(
         },
       ]);
 
-      const response = {
-        pendapatan: null,
-        beban: null,
-      };
+      let totalPendapatan = 0;
+      let totalBeban = 0;
+
+      const pendapatan = [];
+      const beban = [];
 
       accountsPendapatanBeban.forEach((account) => {
         if (account.account_type === 4) {
-          response.pendapatan = account;
+          pendapatan.push(account);
+          totalPendapatan += account.total;
         } else if (account.account_type === 5) {
-          response.beban = account;
+          beban.push(account);
+          totalBeban += account.total;
         }
       });
+
+      const response = {
+        pendapatan,
+        beban,
+        totalPendapatan,
+        totalBeban,
+        labaBersih: totalPendapatan - totalBeban,
+      };
 
       return res.status(200).json({
         code: 200,
