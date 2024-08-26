@@ -133,7 +133,7 @@ router.post("/login", async (req, res, next) => {
     };
 
     const secret = process.env.JWT_SECRET_KEY;
-    const expiresIn = "1h"; // Gunakan "1h" untuk token yang berlaku selama 1 jam
+    const expiresIn = "24h"; // Gunakan "1h" untuk token yang berlaku selama 1 jam
 
     const token = jwt.sign(payload, secret, { expiresIn });
 
