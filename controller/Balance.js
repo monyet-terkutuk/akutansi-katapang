@@ -5,6 +5,122 @@ const Account = require('../model/Account'); // Ensure the path is correct
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const ErrorHandler = require('../utils/ErrorHandler');
 
+const ExcelJS = require('exceljs');
+
+router.get(
+  '/export-buku-besar',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // Helper function to convert MM/DD/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null;
+        const [month, day, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      // Convert the date formats
+      const start = convertDateFormat(startDate);
+      const end = convertDateFormat(endDate);
+
+      const accountsWithJournals = await Account.aggregate([
+        {
+          $lookup: {
+            from: 'journals',
+            let: { accountId: '$_id' },
+            pipeline: [
+              {
+                $unwind: '$detail',
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ['$detail.account', '$$accountId'],
+                  },
+                  ...(start && end ? {
+                    journal_date: { 
+                      $gte: new Date(start),
+                      $lte: new Date(end),
+                    }
+                  } : {})
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  debit: '$detail.debit',
+                  credit: '$detail.credit',
+                  note: '$detail.note',
+                  journal_date: 1,
+                },
+              },
+            ],
+            as: 'journal_details',
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            account_code: 1,
+            account_type: 1,
+            journal_details: 1,
+          },
+        },
+      ]);
+
+      // Create a new workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Buku Besar');
+
+      // Set the headers
+      worksheet.columns = [
+        { header: 'TANGGAL', key: 'journal_date', width: 15 },
+        { header: 'NAMA AKUN', key: 'name', width: 25 },
+        { header: 'DEBIT', key: 'debit', width: 15 },
+        { header: 'KREDIT', key: 'credit', width: 15 },
+        { header: 'SALDO DEBIT', key: 'saldo_debit', width: 20 },
+        { header: 'SALDO KREDIT', key: 'saldo_kredit', width: 20 },
+        { header: 'TOTAL', key: 'total', width: 20 },
+      ];
+
+      // Iterate through the accounts and journal details to fill the rows
+      accountsWithJournals.forEach((account) => {
+        let saldoDebit = 0;
+        let saldoKredit = 0;
+
+        account.journal_details.forEach((detail) => {
+          saldoDebit += detail.debit || 0;
+          saldoKredit += detail.credit || 0;
+
+          worksheet.addRow({
+            journal_date: detail.journal_date.toISOString().split('T')[0],
+            name: account.name,
+            debit: detail.debit || 0,
+            credit: detail.credit || 0,
+            saldo_debit: saldoDebit,
+            saldo_kredit: saldoKredit,
+            total: saldoDebit - saldoKredit,
+          });
+        });
+      });
+
+      // Write the Excel file to the response
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', 'attachment; filename=buku_besar.xlsx');
+
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
 // API to get all journals and calculate totals
 router.get(
   '/calculate-totals',
@@ -236,6 +352,131 @@ router.get(
         status: 'success',
         data: response,
       });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+
+router.get(
+  '/export-buku-besar/:accountCode',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const { accountCode } = req.params; // Ambil accountCode dari URL parameters
+
+      // Helper function to convert MM/DD/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null;
+        const [month, day, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      // Convert the date formats
+      const start = convertDateFormat(startDate);
+      const end = convertDateFormat(endDate);
+
+      // Buat filter untuk account_code jika diberikan
+      const accountFilter = accountCode ? { account_code: parseInt(accountCode) } : {};
+
+      const accountsWithJournals = await Account.aggregate([
+        {
+          $match: accountFilter // Filter berdasarkan kode akun jika diberikan
+        },        
+        {
+          $lookup: {
+            from: 'journals',
+            let: { accountId: '$_id' },
+            pipeline: [
+              {
+                $unwind: '$detail',
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ['$detail.account', '$$accountId'],
+                  },
+                  ...(start && end ? {
+                    journal_date: {
+                      $gte: new Date(start),
+                      $lte: new Date(end),
+                    }
+                  } : {})
+                },
+              },
+              {
+                $sort: { journal_date: 1 }, // Sort by date
+              },
+              {
+                $project: {
+                  _id: 0,
+                  journal_date: 1,
+                  name: 1,
+                  debit: '$detail.debit',
+                  credit: '$detail.credit',
+                  note: '$detail.note',
+                },
+              },
+            ],
+            as: 'journal_details',
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            account_code: 1,
+            journal_details: 1,
+          },
+        },
+      ]);
+
+      // Create a new Excel Workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'YourApp';
+      workbook.created = new Date();
+
+      accountsWithJournals.forEach(account => {
+        const sheet = workbook.addWorksheet(`${account.name.toUpperCase()} (${account.account_code})`);
+      
+        // Add Header Row
+        sheet.addRow(['TANGGAL', 'NAMA AKUN', 'DEBIT', 'KREDIT', 'SALDO DEBIT', 'SALDO KREDIT', 'TOTAL']);
+      
+        let saldoDebit = 0;
+        let saldoKredit = 0;
+        let total = 0;
+      
+        if (account.journal_details.length > 0) {
+          account.journal_details.forEach(detail => {
+            saldoDebit += detail.debit || 0;
+            saldoKredit += detail.credit || 0;
+            total = saldoDebit - saldoKredit;
+      
+            sheet.addRow([
+              detail.journal_date.toLocaleDateString(),
+              account.name,
+              detail.debit || '',
+              detail.credit || '',
+              saldoDebit || '',
+              saldoKredit || '',
+              total
+            ]);
+          });
+        } else {
+          // Jika tidak ada jurnal terkait, tambahkan baris kosong dengan nama akun
+          sheet.addRow(['-', account.name, '-', '-', '-', '-', '-']);
+        }
+      });
+      
+
+      // Write the workbook to a buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Set headers for download
+      res.setHeader('Content-Disposition', 'attachment; filename="Buku-Besar.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
     }
