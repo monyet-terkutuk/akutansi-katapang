@@ -7,6 +7,115 @@ const ErrorHandler = require('../utils/ErrorHandler');
 
 const ExcelJS = require('exceljs');
 
+// Function to calculate total based on account type
+const calculateTotal = async (accountType) => {
+  const result = await Journal.aggregate([
+    { $unwind: '$detail' }, // Unwind to flatten the array of details
+    {
+      $lookup: {
+        from: 'accounts',
+        localField: 'detail.account',
+        foreignField: '_id',
+        as: 'accountInfo',
+      },
+    },
+    { $unwind: '$accountInfo' }, // Unwind the joined account information
+    { $match: { 'accountInfo.account_type': accountType } }, // Match based on account_type
+    {
+      $group: {
+        _id: null,
+        totalDebit: { $sum: '$detail.debit' },
+        totalCredit: { $sum: '$detail.credit' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        total: { $subtract: ['$totalDebit', '$totalCredit'] },
+      },
+    },
+  ]);
+  
+  return result.length > 0 ? result[0].total : 0;
+};
+
+// Function to calculate monthly totals based on account type
+const calculateMonthlyTotals = async (accountType) => {
+  const result = await Journal.aggregate([
+    { $unwind: '$detail' }, // Unwind to flatten the array of details
+    {
+      $lookup: {
+        from: 'accounts',
+        localField: 'detail.account',
+        foreignField: '_id',
+        as: 'accountInfo',
+      },
+    },
+    { $unwind: '$accountInfo' }, // Unwind the joined account information
+    { $match: { 'accountInfo.account_type': accountType } }, // Match based on account_type
+    {
+      $group: {
+        _id: { $month: '$journal_date' }, // Group by month
+        totalDebit: { $sum: '$detail.debit' },
+        totalCredit: { $sum: '$detail.credit' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        month: '$_id',
+        total: { $subtract: ['$totalDebit', '$totalCredit'] },
+      },
+    },
+    { $sort: { month: 1 } } // Sort by month
+  ]);
+
+  return result;
+};
+
+
+// API endpoint to get income and expenses data
+router.get('/finance-data', async (req, res) => {
+  try {
+    const totalIncome = await calculateTotal(4); // 4 for Pendapatan (Income)
+    const totalExpenses = await calculateTotal(5); // 5 for Pengeluaran (Expenses)
+
+    const incomeData = await calculateMonthlyTotals(4); // 4 for Pendapatan (Income)
+    const expenseData = await calculateMonthlyTotals(5); // 5 for Pengeluaran (Expenses)
+
+    const dataCart = [
+      {
+        name: 'Pendapatan',
+        data: incomeData.map(entry => entry.total), // Array of monthly totals
+      },
+      {
+        name: 'Pengeluaran',
+        data: expenseData.map(entry => entry.total), // Array of monthly totals
+      },
+    ];
+
+    const dataInformation = [
+      {
+        name: 'Saldo saat ini',
+        Total: totalIncome - totalExpenses,
+      },
+      {
+        name: 'semua pemasukan',
+        Total: totalIncome,
+      },
+      {
+        name: 'semua pengeluaran',
+        Total: totalExpenses,
+      },
+    ];
+
+    res.json({ dataCart, dataInformation });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while fetching finance data.' });
+  }
+});
+
 // pendapatan-beban Excel export with styling
 router.get(
   '/export-pendapatan-beban',
