@@ -22,6 +22,8 @@ const cors = require("cors");
 app.use(
   cors({
     origin: "*", // Mengizinkan semua origin
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Mengizinkan semua metode
+    credentials: true, // Jika Anda menggunakan cookie
   })
 );
 
