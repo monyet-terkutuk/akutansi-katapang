@@ -10,11 +10,18 @@ const cors = require("cors");
 //   )
 // );
 
+// app.use(
+//   cors({
+//     origin: "https://administrasi-kec-katapang.vercel.app", // Ganti dengan domain front-end Anda
+//     methods: ["GET", "POST", "PUT", "DELETE"], // Metode HTTP yang diizinkan
+//     credentials: true, // Mengizinkan cookie dikirim dalam permintaan lintas domain
+//   })
+// );
+
+
 app.use(
   cors({
-    origin: "https://administrasi-kec-katapang.vercel.app", // Ganti dengan domain front-end Anda
-    methods: ["GET", "POST", "PUT", "DELETE"], // Metode HTTP yang diizinkan
-    credentials: true, // Mengizinkan cookie dikirim dalam permintaan lintas domain
+    origin: "*", // Mengizinkan semua origin
   })
 );
 
